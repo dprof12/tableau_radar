@@ -182,6 +182,16 @@
             </div>
         </div>
 
+        <div class="grid-custom" style="grid-template-columns: 1fr;">
+            <div class="form-group">
+                <label for="valueFormat">Format Angka pada Sumbu & Tooltip:</label>
+                <select id="valueFormat">
+                    <option value="number">Angka Desimal Biasa (0.1, 0.2, dll)</option>
+                    <option value="percentage">Persentase (10%, 20%, dll)</option>
+                </select>
+            </div>
+        </div>
+
         <hr>
         <button class="btn-save" onclick="saveConfiguration()">Simpan Pengaturan</button>
     </main>
@@ -214,6 +224,7 @@
             if (savedSettings.bgColorPick) document.getElementById('bgColorPick').value = savedSettings.bgColorPick;
             if (savedSettings.borderWidth) document.getElementById('borderWidth').value = savedSettings.borderWidth;
             if (savedSettings.maxScale) document.getElementById('maxScale').value = savedSettings.maxScale;
+            if (savedSettings.valueFormat) document.getElementById('valueFormat').value = savedSettings.valueFormat;
 
             // Load groupColors
             let groupColors = {};
@@ -271,6 +282,7 @@
             tableau.extensions.settings.set("bgColorPick", document.getElementById('bgColorPick').value);
             tableau.extensions.settings.set("borderWidth", document.getElementById('borderWidth').value);
             tableau.extensions.settings.set("maxScale", document.getElementById('maxScale').value);
+            tableau.extensions.settings.set("valueFormat", document.getElementById('valueFormat').value);
 
             // Simpan warna multi-dataset
             if (activeGroups && activeGroups.length > 0) {

@@ -123,6 +123,7 @@
             const borderColor = settings.borderColor || 'rgba(54, 162, 235, 1)';
             const borderW = parseInt(settings.borderWidth) || 2;
             const maxScale = (settings.maxScale && !isNaN(settings.maxScale)) ? parseInt(settings.maxScale) : undefined;
+            const valueFormat = settings.valueFormat || 'number';
 
             // 2. Koneksi langsung ke Worksheet aktif (Viz Extension)
             const worksheet = tableau.extensions.worksheetContent.worksheet;
@@ -179,7 +180,7 @@
                 let labels = [];
                 let datasets = [];
 
-                let isPercentage = false;
+                let isPercentage = (valueFormat === 'percentage');
                 let multiplyBy100 = false;
 
                 // Cari baris pertama yang nilainya bukan nol/null untuk menentukan konversi persentase
@@ -191,14 +192,27 @@
                 if (testRow) {
                     const rawVal = testRow[valIdx].value;
                     const formattedVal = testRow[valIdx].formattedValue;
-                    if (formattedVal && formattedVal.includes('%')) {
+                    
+                    // Backup check jika belum diset persentase di menu konfigurasi tapi data asli bertipe persen
+                    if (!isPercentage && formattedVal && formattedVal.includes('%')) {
                         isPercentage = true;
+                    }
+
+                    if (isPercentage) {
                         if (rawVal !== null && rawVal !== 0) {
-                            // Bersihkan string format untuk mengekstrak angka numeriknya saja
-                            const cleanFormatted = parseFloat(formattedVal.replace(/[^0-9.,]/g, '').replace(',', '.'));
-                            // Jika perbandingan formatted / rawVal mendekati 100, berarti raw value adalah desimal (misal 0.65 -> 65%)
-                            if (Math.abs((cleanFormatted / rawVal) - 100) < 10) {
-                                multiplyBy100 = true;
+                            if (formattedVal && formattedVal.includes('%')) {
+                                // Bersihkan string format untuk mengekstrak angka numeriknya saja
+                                const cleanFormatted = parseFloat(formattedVal.replace(/[^0-9.,]/g, '').replace(',', '.'));
+                                // Jika perbandingan formatted / rawVal mendekati 100, berarti raw value adalah desimal (misal 0.65 -> 65%)
+                                if (Math.abs((cleanFormatted / rawVal) - 100) < 10) {
+                                    multiplyBy100 = true;
+                                }
+                            } else {
+                                // Jika tidak ada simbol % di formattedValue (karena bug worksheet formatting), tapi diatur persen manual
+                                // Kita cek jika rawVal di kisaran desimal kecil (<= 1.5)
+                                if (Math.abs(rawVal) <= 1.5) {
+                                    multiplyBy100 = true;
+                                }
                             }
                         } else {
                             multiplyBy100 = true;
@@ -216,7 +230,13 @@
                     dataTable.data.forEach(row => {
                         labelsSet.push(row[catIdx].formattedValue);
                         dataValues.push(row[valIdx].value);
-                        formattedValues.push(row[valIdx].formattedValue);
+                        
+                        let fVal = row[valIdx].formattedValue;
+                        if (isPercentage && (!fVal || !fVal.includes('%'))) {
+                            const displayVal = multiplyBy100 ? row[valIdx].value * 100 : row[valIdx].value;
+                            fVal = parseFloat(displayVal.toFixed(3)) + '%';
+                        }
+                        formattedValues.push(fVal);
                     });
 
                     labels = labelsSet;
@@ -281,10 +301,16 @@
                             const valObj = dataMap[groupName][label];
                             if (valObj !== undefined) {
                                 dataValues.push(valObj.value);
-                                formattedValues.push(valObj.formatted);
+                                
+                                let fVal = valObj.formatted;
+                                if (isPercentage && (!fVal || !fVal.includes('%'))) {
+                                    const displayVal = multiplyBy100 ? valObj.value * 100 : valObj.value;
+                                    fVal = parseFloat(displayVal.toFixed(3)) + '%';
+                                }
+                                formattedValues.push(fVal);
                             } else {
                                 dataValues.push(0);
-                                formattedValues.push("0");
+                                formattedValues.push(isPercentage ? "0%" : "0");
                             }
                         });
 
