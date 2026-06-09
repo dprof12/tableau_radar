@@ -179,15 +179,44 @@
                 let labels = [];
                 let datasets = [];
 
+                let isPercentage = false;
+                let multiplyBy100 = false;
+
+                // Cari baris pertama yang nilainya bukan nol/null untuk menentukan konversi persentase
+                let testRow = dataTable.data.find(row => row[valIdx].value !== null && row[valIdx].value !== 0);
+                if (!testRow && dataTable.data.length > 0) {
+                    testRow = dataTable.data[0];
+                }
+
+                if (testRow) {
+                    const rawVal = testRow[valIdx].value;
+                    const formattedVal = testRow[valIdx].formattedValue;
+                    if (formattedVal && formattedVal.includes('%')) {
+                        isPercentage = true;
+                        if (rawVal !== null && rawVal !== 0) {
+                            // Bersihkan string format untuk mengekstrak angka numeriknya saja
+                            const cleanFormatted = parseFloat(formattedVal.replace(/[^0-9.,]/g, '').replace(',', '.'));
+                            // Jika perbandingan formatted / rawVal mendekati 100, berarti raw value adalah desimal (misal 0.65 -> 65%)
+                            if (Math.abs((cleanFormatted / rawVal) - 100) < 10) {
+                                multiplyBy100 = true;
+                            }
+                        } else {
+                            multiplyBy100 = true;
+                        }
+                    }
+                }
+
                 if (groupIdx === -1) {
                     // Single Dataset
                     activeGroups = [];
                     let labelsSet = [];
                     let dataValues = [];
+                    let formattedValues = [];
 
                     dataTable.data.forEach(row => {
                         labelsSet.push(row[catIdx].formattedValue);
                         dataValues.push(row[valIdx].value);
+                        formattedValues.push(row[valIdx].formattedValue);
                     });
 
                     labels = labelsSet;
@@ -195,6 +224,7 @@
                     datasets = [{
                         label: settings.datasetLabel || 'Nilai Indikator',
                         data: dataValues,
+                        formattedValues: formattedValues,
                         backgroundColor: bgColor,
                         borderColor: borderColor,
                         borderWidth: borderW,
@@ -209,17 +239,18 @@
                     labels = allLabels;
                     activeGroups = allGroups;
 
-                    // Buat map pencarian data: { Group: { Category: Value } }
+                    // Buat map pencarian data: { Group: { Category: { value, formatted } } }
                     const dataMap = {};
                     dataTable.data.forEach(row => {
                         const gVal = row[groupIdx].formattedValue;
                         const cVal = row[catIdx].formattedValue;
                         const vVal = row[valIdx].value;
+                        const fVal = row[valIdx].formattedValue;
 
                         if (!dataMap[gVal]) {
                             dataMap[gVal] = {};
                         }
-                        dataMap[gVal][cVal] = vVal;
+                        dataMap[gVal][cVal] = { value: vVal, formatted: fVal };
                     });
 
                     // Parse saved group colors
@@ -243,9 +274,18 @@
                     ];
 
                     datasets = allGroups.map((groupName, idx) => {
-                        const dataValues = allLabels.map(label => {
-                            const val = dataMap[groupName][label];
-                            return val !== undefined ? val : 0;
+                        const dataValues = [];
+                        const formattedValues = [];
+
+                        allLabels.forEach(label => {
+                            const valObj = dataMap[groupName][label];
+                            if (valObj !== undefined) {
+                                dataValues.push(valObj.value);
+                                formattedValues.push(valObj.formatted);
+                            } else {
+                                dataValues.push(0);
+                                formattedValues.push("0");
+                            }
                         });
 
                         let borderCol = groupColors[groupName];
@@ -262,6 +302,7 @@
                         return {
                             label: groupName,
                             data: dataValues,
+                            formattedValues: formattedValues,
                             backgroundColor: bgCol,
                             borderColor: borderCol,
                             borderWidth: borderW,
@@ -275,11 +316,45 @@
                 // 3. Render ke Chart.js
                 const ctx = document.getElementById('radarCanvas').getContext('2d');
                 
+                const chartOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const dataset = context.dataset;
+                                    const index = context.dataIndex;
+                                    const formattedVal = dataset.formattedValues ? dataset.formattedValues[index] : context.formattedValue;
+                                    return dataset.label + ': ' + formattedVal;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            suggestedMin: 0,
+                            suggestedMax: maxScale,
+                            ticks: { 
+                                font: { size: 10 },
+                                callback: function(value, index, values) {
+                                    if (isPercentage) {
+                                        const displayVal = multiplyBy100 ? value * 100 : value;
+                                        return parseFloat(displayVal.toFixed(2)) + '%';
+                                    }
+                                    return value;
+                                }
+                            },
+                            pointLabels: { font: { size: 11, weight: 'bold' } }
+                        }
+                    }
+                };
+
                 if (myRadarChart) {
                     // Jika grafik sudah ada, tinggal update datanya (Animasi mulus)
                     myRadarChart.data.labels = labels;
                     myRadarChart.data.datasets = datasets;
-                    myRadarChart.options.scales.r.suggestedMax = maxScale;
+                    myRadarChart.options = chartOptions;
                     myRadarChart.update();
                 } else {
                     // Jika baru pertama kali dimuat, buat objek grafik baru
@@ -289,18 +364,7 @@
                             labels: labels,
                             datasets: datasets
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                                r: {
-                                    suggestedMin: 0,
-                                    suggestedMax: maxScale,
-                                    ticks: { font: { size: 10 } },
-                                    pointLabels: { font: { size: 11, weight: 'bold' } }
-                                }
-                            }
-                        }
+                        options: chartOptions
                     });
                 }
             } catch (err) {
