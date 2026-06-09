@@ -157,8 +157,8 @@
                     return;
                 }
 
-                // Ambil Summary Data dari Tableau
-                const dataTable = await worksheet.getSummaryDataAsync();
+                // Ambil Summary Data dari Tableau dengan mengabaikan seleksi klik agar chart tidak runtuh/menghilang
+                const dataTable = await worksheet.getSummaryDataAsync({ ignoreSelection: true });
                 
                 // Cari indeks kolom berdasarkan nama kolom yang didapat dari rak kustom
                 const catCol = dataTable.columns.find(col => col.fieldName === xAxisFieldName);
