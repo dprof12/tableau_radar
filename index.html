@@ -78,8 +78,8 @@
 
         // Fungsi untuk membuka popup konfigurasi
         function configure() {
-            // Menghasilkan URL absolut dinamis yang mengarah ke config.html pada direktori yang sama
-            const popupUrl = new URL('config.html', window.location.href).href;
+            // Menghasilkan URL absolut dinamis yang mengarah ke config.html pada direktori yang sama dengan cache buster
+            const popupUrl = new URL('config.html?v=' + Date.now(), window.location.href).href;
             const payload = JSON.stringify({ activeGroups: activeGroups });
             
             tableau.extensions.ui.displayDialogAsync(popupUrl, payload, {
