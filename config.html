@@ -140,22 +140,11 @@
     <main class="container">
         <h3>🎯 Pengaturan Radar Chart</h3>
         
-        <div class="section-title">Pemetaan Data (Data Mapping)</div>
+        <div class="section-title">Label & Informasi</div>
         <div class="grid-custom" style="grid-template-columns: 1fr;">
             <div class="form-group">
-                <label for="datasetLabel">Label Dataset:</label>
-                <input type="text" id="datasetLabel" placeholder="Contoh: Tahun 2026">
-            </div>
-        </div>
-        
-        <div class="grid-custom">
-            <div class="form-group">
-                <label for="selectCatColumn">Kolom Kategori (Dimensi):</label>
-                <select id="selectCatColumn"></select>
-            </div>
-            <div class="form-group">
-                <label for="selectValColumn">Kolom Nilai (Measure):</label>
-                <select id="selectValColumn"></select>
+                <label for="datasetLabel">Label Dataset (Single Dataset):</label>
+                <input type="text" id="datasetLabel" placeholder="Contoh: Nilai Indikator">
             </div>
         </div>
 
@@ -196,11 +185,6 @@
         tableau.extensions.initializeDialogAsync().then(() => {
             const savedSettings = tableau.extensions.settings.getAll();
             
-            loadColumns().then(() => {
-                if(savedSettings.catColumn) document.getElementById('selectCatColumn').value = savedSettings.catColumn;
-                if(savedSettings.valColumn) document.getElementById('selectValColumn').value = savedSettings.valColumn;
-            });
-
             if(savedSettings.datasetLabel) document.getElementById('datasetLabel').value = savedSettings.datasetLabel;
             if(savedSettings.borderColor) document.getElementById('borderColor').value = savedSettings.borderColor;
             if(savedSettings.bgColorPick) document.getElementById('bgColorPick').value = savedSettings.bgColorPick;
@@ -208,38 +192,9 @@
             if(savedSettings.maxScale) document.getElementById('maxScale').value = savedSettings.maxScale;
         });
 
-        // Memuat nama kolom secara dinamis dari worksheet aktif (Viz Extension)
-        async function loadColumns() {
-            const worksheet = tableau.extensions.worksheetContent.worksheet;
-            if (!worksheet) return;
-            
-            try {
-                const dataTable = await worksheet.getSummaryDataAsync();
-                const catSelect = document.getElementById('selectCatColumn');
-                const valSelect = document.getElementById('selectValColumn');
-                
-                catSelect.innerHTML = "";
-                valSelect.innerHTML = "";
-                
-                dataTable.columns.forEach(col => {
-                    let optCat = document.createElement('option');
-                    optCat.value = col.fieldName; optCat.innerHTML = col.fieldName;
-                    catSelect.appendChild(optCat);
-
-                    let optVal = document.createElement('option');
-                    optVal.value = col.fieldName; optVal.innerHTML = col.fieldName;
-                    valSelect.appendChild(optVal);
-                });
-            } catch (err) {
-                console.error("Gagal memuat kolom dari worksheet:", err);
-            }
-        }
-
         // Menyimpan setting ke dalam Workbook Tableau secara permanen
         function saveConfiguration() {
             tableau.extensions.settings.set("datasetLabel", document.getElementById('datasetLabel').value);
-            tableau.extensions.settings.set("catColumn", document.getElementById('selectCatColumn').value);
-            tableau.extensions.settings.set("valColumn", document.getElementById('selectValColumn').value);
             tableau.extensions.settings.set("borderColor", document.getElementById('borderColor').value);
             tableau.extensions.settings.set("bgColor", document.getElementById('bgColorPick').value);
             tableau.extensions.settings.set("bgColorPick", document.getElementById('bgColorPick').value);

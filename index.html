@@ -97,11 +97,6 @@
         async function renderRadarFromTableau() {
             // 1. Ambil Pengaturan UI yang disimpan dari config.html
             const settings = tableau.extensions.settings.getAll();
-            
-            if (!settings.catColumn || !settings.valColumn) {
-                showError("Silakan lakukan konfigurasi ekstensi terlebih dahulu (Pilih Mark Type -> <b>Configure</b>).", "Konfigurasi Diperlukan");
-                return;
-            }
 
             // Ambil preferensi desain dari UI setting (Jika belum diatur, gunakan default)
             const bgColor = settings.bgColor || 'rgba(54, 162, 235, 0.2)';
@@ -118,29 +113,121 @@
             }
 
             try {
+                // Ambil spesifikasi visual (pemetaan rak kustom)
+                const visualSpec = await worksheet.getVisualSpecificationAsync();
+                
+                if (!visualSpec.marksSpecifications || visualSpec.marksSpecifications.length === 0) {
+                    showError("Tidak ada spesifikasi marks yang ditemukan.", "Konfigurasi Diperlukan");
+                    return;
+                }
+
+                const marksSpec = visualSpec.marksSpecifications[visualSpec.activeMarksSpecificationIndex];
+                const encodings = marksSpec.encodings;
+
+                const dimensionEncoding = encodings.find(e => e.id === 'dimension');
+                const xAxisEncoding = encodings.find(e => e.id === 'x-axis');
+                const measureEncoding = encodings.find(e => e.id === 'measure');
+
+                const dimensionFieldName = dimensionEncoding && dimensionEncoding.fields.length > 0 ? dimensionEncoding.fields[0].name : null;
+                const xAxisFieldName = xAxisEncoding && xAxisEncoding.fields.length > 0 ? xAxisEncoding.fields[0].name : null;
+                const measureFieldName = measureEncoding && measureEncoding.fields.length > 0 ? measureEncoding.fields[0].name : null;
+
+                if (!xAxisFieldName || !measureFieldName) {
+                    showError("Harap seret data ke rak <b>X-Axis</b> (kategori) dan rak <b>Measure</b> (nilai) pada Marks Card.", "Posisikan Kolom Data");
+                    return;
+                }
+
                 // Ambil Summary Data dari Tableau
                 const dataTable = await worksheet.getSummaryDataAsync();
                 
-                // Cari indeks kolom berdasarkan nama kolom yang dipilih di UI
-                const catCol = dataTable.columns.find(col => col.fieldName === settings.catColumn);
-                const valCol = dataTable.columns.find(col => col.fieldName === settings.valColumn);
+                // Cari indeks kolom berdasarkan nama kolom yang didapat dari rak kustom
+                const catCol = dataTable.columns.find(col => col.fieldName === xAxisFieldName);
+                const valCol = dataTable.columns.find(col => col.fieldName === measureFieldName);
 
                 if (!catCol || !valCol) {
-                    showError("Kolom kategori atau nilai yang dikonfigurasi tidak dapat ditemukan dalam data sheet. Silakan lakukan konfigurasi ulang.", "Kolom Tidak Ditemukan");
+                    showError("Kolom yang ditarik ke rak X-Axis atau Measure tidak dapat dicocokkan dengan data tabel.", "Kolom Tidak Ditemukan");
                     return;
                 }
 
                 const catIdx = catCol.index;
                 const valIdx = valCol.index;
 
-                let labels = [];
-                let dataValues = [];
+                // Cek jika ada kolom pengelompokan (rak Dimension)
+                const groupCol = dimensionFieldName ? dataTable.columns.find(col => col.fieldName === dimensionFieldName) : null;
+                const groupIdx = groupCol ? groupCol.index : -1;
 
-                // Ekstrak data nyata dari Tableau
-                dataTable.data.forEach(row => {
-                    labels.push(row[catIdx].formattedValue);
-                    dataValues.push(row[valIdx].value);
-                });
+                let labels = [];
+                let datasets = [];
+
+                if (groupIdx === -1) {
+                    // Single Dataset
+                    let labelsSet = [];
+                    let dataValues = [];
+
+                    dataTable.data.forEach(row => {
+                        labelsSet.push(row[catIdx].formattedValue);
+                        dataValues.push(row[valIdx].value);
+                    });
+
+                    labels = labelsSet;
+
+                    datasets = [{
+                        label: settings.datasetLabel || 'Nilai Indikator',
+                        data: dataValues,
+                        backgroundColor: bgColor,
+                        borderColor: borderColor,
+                        borderWidth: borderW,
+                        pointBackgroundColor: borderColor
+                    }];
+                } else {
+                    // Multi-Dataset (bertumpuk)
+                    // Ekstrak nilai unik kategori (X-Axis) dan pengelompokan (Dimension)
+                    const allLabels = [...new Set(dataTable.data.map(row => row[catIdx].formattedValue))];
+                    const allGroups = [...new Set(dataTable.data.map(row => row[groupIdx].formattedValue))];
+
+                    labels = allLabels;
+
+                    // Buat map pencarian data: { Group: { Category: Value } }
+                    const dataMap = {};
+                    dataTable.data.forEach(row => {
+                        const gVal = row[groupIdx].formattedValue;
+                        const cVal = row[catIdx].formattedValue;
+                        const vVal = row[valIdx].value;
+
+                        if (!dataMap[gVal]) {
+                            dataMap[gVal] = {};
+                        }
+                        dataMap[gVal][cVal] = vVal;
+                    });
+
+                    // Palet warna premium yang serasi
+                    const PALETTE = [
+                        { border: 'rgba(54, 162, 235, 1)', bg: 'rgba(54, 162, 235, 0.2)' },    // Biru
+                        { border: 'rgba(75, 192, 192, 1)', bg: 'rgba(75, 192, 192, 0.2)' },    // Toska
+                        { border: 'rgba(255, 99, 132, 1)', bg: 'rgba(255, 99, 132, 0.2)' },    // Merah
+                        { border: 'rgba(255, 159, 64, 1)', bg: 'rgba(255, 159, 64, 0.2)' },    // Jingga
+                        { border: 'rgba(153, 102, 255, 1)', bg: 'rgba(153, 102, 255, 0.2)' },  // Ungu
+                        { border: 'rgba(255, 205, 86, 1)', bg: 'rgba(255, 205, 86, 0.2)' }     // Kuning
+                    ];
+
+                    datasets = allGroups.map((groupName, idx) => {
+                        const dataValues = allLabels.map(label => {
+                            const val = dataMap[groupName][label];
+                            return val !== undefined ? val : 0;
+                        });
+
+                        const color = PALETTE[idx % PALETTE.length];
+
+                        return {
+                            label: groupName,
+                            data: dataValues,
+                            backgroundColor: color.bg,
+                            borderColor: color.border,
+                            borderWidth: borderW,
+                            pointBackgroundColor: color.border
+                        };
+                    });
+                }
 
                 hideError();
 
@@ -150,10 +237,7 @@
                 if (myRadarChart) {
                     // Jika grafik sudah ada, tinggal update datanya (Animasi mulus)
                     myRadarChart.data.labels = labels;
-                    myRadarChart.data.datasets[0].data = dataValues;
-                    myRadarChart.data.datasets[0].backgroundColor = bgColor;
-                    myRadarChart.data.datasets[0].borderColor = borderColor;
-                    myRadarChart.data.datasets[0].borderWidth = borderW;
+                    myRadarChart.data.datasets = datasets;
                     myRadarChart.options.scales.r.suggestedMax = maxScale;
                     myRadarChart.update();
                 } else {
@@ -162,14 +246,7 @@
                         type: 'radar',
                         data: {
                             labels: labels,
-                            datasets: [{
-                                label: settings.datasetLabel || 'Nilai Indikator',
-                                data: dataValues,
-                                backgroundColor: bgColor,
-                                borderColor: borderColor,
-                                borderWidth: borderW,
-                                pointBackgroundColor: borderColor
-                            }]
+                            datasets: datasets
                         },
                         options: {
                             responsive: true,
