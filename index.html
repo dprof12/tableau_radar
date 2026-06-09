@@ -128,9 +128,9 @@
                 const xAxisEncoding = encodings.find(e => e.id === 'x-axis');
                 const measureEncoding = encodings.find(e => e.id === 'measure');
 
-                const dimensionFieldName = dimensionEncoding && dimensionEncoding.fields.length > 0 ? dimensionEncoding.fields[0].name : null;
-                const xAxisFieldName = xAxisEncoding && xAxisEncoding.fields.length > 0 ? xAxisEncoding.fields[0].name : null;
-                const measureFieldName = measureEncoding && measureEncoding.fields.length > 0 ? measureEncoding.fields[0].name : null;
+                const dimensionFieldName = dimensionEncoding && dimensionEncoding.fields && dimensionEncoding.fields.length > 0 ? dimensionEncoding.fields[0].name : null;
+                const xAxisFieldName = xAxisEncoding && xAxisEncoding.fields && xAxisEncoding.fields.length > 0 ? xAxisEncoding.fields[0].name : null;
+                const measureFieldName = measureEncoding && measureEncoding.fields && measureEncoding.fields.length > 0 ? measureEncoding.fields[0].name : null;
 
                 if (!xAxisFieldName || !measureFieldName) {
                     showError("Harap seret data ke rak <b>X-Axis</b> (kategori) dan rak <b>Measure</b> (nilai) pada Marks Card.", "Posisikan Kolom Data");
