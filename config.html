@@ -149,7 +149,7 @@
         </div>
 
         <div class="section-title">Desain & Warna (Styling)</div>
-        <div class="grid-custom">
+        <div class="grid-custom" id="single-color-section">
             <div class="form-group">
                 <label for="borderColor">Warna Garis:</label>
                 <input type="color" id="borderColor" value="#36a2eb">
@@ -162,6 +162,12 @@
                     <option value="rgba(75, 192, 192, 0.2)">Hijau Toska Transparan</option>
                     <option value="rgba(255, 206, 86, 0.2)">Kuning Transparan</option>
                 </select>
+            </div>
+        </div>
+
+        <div id="multi-color-section" style="display: none;">
+            <div class="grid-custom" id="group-colors-container">
+                <!-- Diisi dinamis -->
             </div>
         </div>
 
@@ -181,16 +187,81 @@
     </main>
 
     <script>
+        let activeGroups = [];
+        let savedSettings = {};
+
         // Inisialisasi jendela dialog ekstensi
-        tableau.extensions.initializeDialogAsync().then(() => {
-            const savedSettings = tableau.extensions.settings.getAll();
+        tableau.extensions.initializeDialogAsync().then((initialPayload) => {
+            savedSettings = tableau.extensions.settings.getAll();
             
-            if(savedSettings.datasetLabel) document.getElementById('datasetLabel').value = savedSettings.datasetLabel;
-            if(savedSettings.borderColor) document.getElementById('borderColor').value = savedSettings.borderColor;
-            if(savedSettings.bgColorPick) document.getElementById('bgColorPick').value = savedSettings.bgColorPick;
-            if(savedSettings.borderWidth) document.getElementById('borderWidth').value = savedSettings.borderWidth;
-            if(savedSettings.maxScale) document.getElementById('maxScale').value = savedSettings.maxScale;
+            if (initialPayload) {
+                try {
+                    const parsed = JSON.parse(initialPayload);
+                    if (parsed && Array.isArray(parsed.activeGroups)) {
+                        activeGroups = parsed.activeGroups;
+                    }
+                } catch (e) {
+                    console.error("Gagal men-parse payload:", e);
+                }
+            }
+
+            initForm();
         });
+
+        function initForm() {
+            if (savedSettings.datasetLabel) document.getElementById('datasetLabel').value = savedSettings.datasetLabel;
+            if (savedSettings.borderColor) document.getElementById('borderColor').value = savedSettings.borderColor;
+            if (savedSettings.bgColorPick) document.getElementById('bgColorPick').value = savedSettings.bgColorPick;
+            if (savedSettings.borderWidth) document.getElementById('borderWidth').value = savedSettings.borderWidth;
+            if (savedSettings.maxScale) document.getElementById('maxScale').value = savedSettings.maxScale;
+
+            // Load groupColors
+            let groupColors = {};
+            if (savedSettings.groupColors) {
+                try {
+                    groupColors = JSON.parse(savedSettings.groupColors);
+                } catch (e) {
+                    console.error("Gagal men-parse groupColors:", e);
+                }
+            }
+
+            if (activeGroups && activeGroups.length > 0) {
+                // Sembunyikan single-color, tunjukkan multi-color
+                document.getElementById('single-color-section').style.display = 'none';
+                document.getElementById('multi-color-section').style.display = 'block';
+
+                const container = document.getElementById('group-colors-container');
+                container.innerHTML = '';
+
+                // Default palette
+                const PALETTE = ['#36a2eb', '#4bc0c0', '#ff6384', '#ff9f40', '#9966ff', '#ffcd56'];
+
+                activeGroups.forEach((group, idx) => {
+                    const savedColor = groupColors[group] || PALETTE[idx % PALETTE.length];
+
+                    const formGroup = document.createElement('div');
+                    formGroup.className = 'form-group';
+
+                    const label = document.createElement('label');
+                    label.htmlFor = 'color_' + idx;
+                    label.innerText = `Warna Garis (${group}):`;
+
+                    const input = document.createElement('input');
+                    input.type = 'color';
+                    input.id = 'color_' + idx;
+                    input.value = savedColor;
+                    input.setAttribute('data-group', group);
+
+                    formGroup.appendChild(label);
+                    formGroup.appendChild(input);
+                    container.appendChild(formGroup);
+                });
+            } else {
+                // Tunjukkan single-color, sembunyikan multi-color
+                document.getElementById('single-color-section').style.display = 'grid';
+                document.getElementById('multi-color-section').style.display = 'none';
+            }
+        }
 
         // Menyimpan setting ke dalam Workbook Tableau secara permanen
         function saveConfiguration() {
@@ -200,6 +271,18 @@
             tableau.extensions.settings.set("bgColorPick", document.getElementById('bgColorPick').value);
             tableau.extensions.settings.set("borderWidth", document.getElementById('borderWidth').value);
             tableau.extensions.settings.set("maxScale", document.getElementById('maxScale').value);
+
+            // Simpan warna multi-dataset
+            if (activeGroups && activeGroups.length > 0) {
+                const groupColors = {};
+                activeGroups.forEach((group, idx) => {
+                    const input = document.getElementById('color_' + idx);
+                    if (input) {
+                        groupColors[group] = input.value;
+                    }
+                });
+                tableau.extensions.settings.set("groupColors", JSON.stringify(groupColors));
+            }
 
             // Simpan secara asinkron lalu tutup jendela pop-up dialog
             tableau.extensions.settings.saveAsync().then(() => {

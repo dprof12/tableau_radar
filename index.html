@@ -52,6 +52,18 @@
 
     <script>
         let myRadarChart = null;
+        let activeGroups = [];
+
+        function hexToRgba(hex, alpha) {
+            hex = hex.replace('#', '');
+            if (hex.length === 3) {
+                hex = hex.split('').map(char => char + char).join('');
+            }
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
 
         // Inisialisasi Ekstensi Tableau dengan callback configure
         tableau.extensions.initializeAsync({ 'configure': configure }).then(() => {
@@ -68,9 +80,10 @@
         function configure() {
             // Menghasilkan URL absolut dinamis yang mengarah ke config.html pada direktori yang sama
             const popupUrl = new URL('config.html', window.location.href).href;
+            const payload = JSON.stringify({ activeGroups: activeGroups });
             
-            tableau.extensions.ui.displayDialogAsync(popupUrl, "", {
-                height: 480,
+            tableau.extensions.ui.displayDialogAsync(popupUrl, payload, {
+                height: 520,
                 width: 580
             }).then((closePayload) => {
                 // Saat dialog ditutup, render ulang radar chart dengan data/setting yang baru disimpan
@@ -168,6 +181,7 @@
 
                 if (groupIdx === -1) {
                     // Single Dataset
+                    activeGroups = [];
                     let labelsSet = [];
                     let dataValues = [];
 
@@ -193,6 +207,7 @@
                     const allGroups = [...new Set(dataTable.data.map(row => row[groupIdx].formattedValue))];
 
                     labels = allLabels;
+                    activeGroups = allGroups;
 
                     // Buat map pencarian data: { Group: { Category: Value } }
                     const dataMap = {};
@@ -206,6 +221,16 @@
                         }
                         dataMap[gVal][cVal] = vVal;
                     });
+
+                    // Parse saved group colors
+                    let groupColors = {};
+                    if (settings.groupColors) {
+                        try {
+                            groupColors = JSON.parse(settings.groupColors);
+                        } catch (e) {
+                            console.error("Gagal men-parse groupColors:", e);
+                        }
+                    }
 
                     // Palet warna premium yang serasi
                     const PALETTE = [
@@ -223,15 +248,24 @@
                             return val !== undefined ? val : 0;
                         });
 
-                        const color = PALETTE[idx % PALETTE.length];
+                        let borderCol = groupColors[groupName];
+                        let bgCol;
+
+                        if (borderCol) {
+                            bgCol = hexToRgba(borderCol, 0.2);
+                        } else {
+                            const color = PALETTE[idx % PALETTE.length];
+                            borderCol = color.border;
+                            bgCol = color.bg;
+                        }
 
                         return {
                             label: groupName,
                             data: dataValues,
-                            backgroundColor: color.bg,
-                            borderColor: color.border,
+                            backgroundColor: bgCol,
+                            borderColor: borderCol,
                             borderWidth: borderW,
-                            pointBackgroundColor: color.border
+                            pointBackgroundColor: borderCol
                         };
                     });
                 }
