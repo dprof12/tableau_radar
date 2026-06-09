@@ -141,11 +141,7 @@
         <h3>🎯 Pengaturan Radar Chart</h3>
         
         <div class="section-title">Pemetaan Data (Data Mapping)</div>
-        <div class="grid-custom">
-            <div class="form-group">
-                <label for="selectSheet">Pilih Sumber Sheet:</label>
-                <select id="selectSheet" onchange="loadColumns()"></select>
-            </div>
+        <div class="grid-custom" style="grid-template-columns: 1fr;">
             <div class="form-group">
                 <label for="datasetLabel">Label Dataset:</label>
                 <input type="text" id="datasetLabel" placeholder="Contoh: Tahun 2026">
@@ -198,20 +194,7 @@
     <script>
         // Inisialisasi jendela dialog ekstensi
         tableau.extensions.initializeDialogAsync().then(() => {
-            const dashboard = tableau.extensions.dashboardContent.dashboard;
-            const selectSheet = document.getElementById('selectSheet');
-            
-            // Isi pilihan Dropdown dengan semua nama Sheet yang ada di Dashboard Tableau Anda
-            dashboard.worksheets.forEach(worksheet => {
-                let opt = document.createElement('option');
-                opt.value = worksheet.name;
-                opt.innerHTML = worksheet.name;
-                selectSheet.appendChild(opt);
-            });
-
-            // Load konfigurasi lama jika user membuka kembali menu config ini
             const savedSettings = tableau.extensions.settings.getAll();
-            if(savedSettings.targetSheet) selectSheet.value = savedSettings.targetSheet;
             
             loadColumns().then(() => {
                 if(savedSettings.catColumn) document.getElementById('selectCatColumn').value = savedSettings.catColumn;
@@ -225,12 +208,9 @@
             if(savedSettings.maxScale) document.getElementById('maxScale').value = savedSettings.maxScale;
         });
 
-        // Memuat nama kolom secara dinamis saat user memilih Sheet
+        // Memuat nama kolom secara dinamis dari worksheet aktif (Viz Extension)
         async function loadColumns() {
-            const sheetName = document.getElementById('selectSheet').value;
-            if (!sheetName) return;
-            const dashboard = tableau.extensions.dashboardContent.dashboard;
-            const worksheet = dashboard.worksheets.find(ws => ws.name === sheetName);
+            const worksheet = tableau.extensions.worksheetContent.worksheet;
             if (!worksheet) return;
             
             try {
@@ -257,13 +237,6 @@
 
         // Menyimpan setting ke dalam Workbook Tableau secara permanen
         function saveConfiguration() {
-            const sheetValue = document.getElementById('selectSheet').value;
-            if (!sheetValue) {
-                alert("Harap pilih sumber worksheet terlebih dahulu.");
-                return;
-            }
-
-            tableau.extensions.settings.set("targetSheet", sheetValue);
             tableau.extensions.settings.set("datasetLabel", document.getElementById('datasetLabel').value);
             tableau.extensions.settings.set("catColumn", document.getElementById('selectCatColumn').value);
             tableau.extensions.settings.set("valColumn", document.getElementById('selectValColumn').value);

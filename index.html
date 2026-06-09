@@ -44,7 +44,7 @@
     <div id="error-msg">
         <span class="icon">⚙️</span>
         <div class="title" id="error-title">Konfigurasi Diperlukan</div>
-        <div id="error-text">Silakan lakukan konfigurasi ekstensi terlebih dahulu melalui menu dropdown di Tableau (Klik panah kanan atas -> <b>Configure</b>).</div>
+        <div id="error-text">Silakan lakukan konfigurasi ekstensi terlebih dahulu (Pilih Mark Type -> <b>Configure</b>).</div>
     </div>
     <div class="chart-wrapper">
         <canvas id="radarCanvas"></canvas>
@@ -58,9 +58,10 @@
             // Jalankan fungsi fetch data
             renderRadarFromTableau();
             
-            // Pasang Listener: Jika user mengubah filter di dashboard, radar otomatis update!
-            const dashboard = tableau.extensions.dashboardContent.dashboard;
-            dashboard.addEventListener(tableau.TableauEventType.FilterChanged, renderRadarFromTableau);
+            // Pasang Listener pada worksheet aktif: jika data atau filter berubah, radar terupdate!
+            const worksheet = tableau.extensions.worksheetContent.worksheet;
+            worksheet.addEventListener(tableau.TableauEventType.FilterChanged, renderRadarFromTableau);
+            worksheet.addEventListener(tableau.TableauEventType.SummaryDataChanged, renderRadarFromTableau);
         });
 
         // Fungsi untuk membuka popup konfigurasi
@@ -69,8 +70,8 @@
             const popupUrl = new URL('config.html', window.location.href).href;
             
             tableau.extensions.ui.displayDialogAsync(popupUrl, "", {
-                height: 550,
-                width: 600
+                height: 480,
+                width: 580
             }).then((closePayload) => {
                 // Saat dialog ditutup, render ulang radar chart dengan data/setting yang baru disimpan
                 renderRadarFromTableau();
@@ -97,8 +98,8 @@
             // 1. Ambil Pengaturan UI yang disimpan dari config.html
             const settings = tableau.extensions.settings.getAll();
             
-            if (!settings.targetSheet || !settings.catColumn || !settings.valColumn) {
-                showError("Silakan lakukan konfigurasi ekstensi terlebih dahulu melalui menu dropdown di Tableau (Klik panah kanan atas -> <b>Configure</b>).", "Konfigurasi Diperlukan");
+            if (!settings.catColumn || !settings.valColumn) {
+                showError("Silakan lakukan konfigurasi ekstensi terlebih dahulu (Pilih Mark Type -> <b>Configure</b>).", "Konfigurasi Diperlukan");
                 return;
             }
 
@@ -108,12 +109,11 @@
             const borderW = parseInt(settings.borderWidth) || 2;
             const maxScale = (settings.maxScale && !isNaN(settings.maxScale)) ? parseInt(settings.maxScale) : undefined;
 
-            // 2. Koneksi ke Worksheet Tableau
-            const dashboard = tableau.extensions.dashboardContent.dashboard;
-            const worksheet = dashboard.worksheets.find(ws => ws.name === settings.targetSheet);
+            // 2. Koneksi langsung ke Worksheet aktif (Viz Extension)
+            const worksheet = tableau.extensions.worksheetContent.worksheet;
             
             if (!worksheet) {
-                showError(`Worksheet bernama "<b>${settings.targetSheet}</b>" tidak ditemukan di dashboard ini. Harap konfigurasi ulang.`, "Worksheet Tidak Ditemukan");
+                showError("Tidak dapat terhubung dengan worksheet aktif.", "Error Worksheet");
                 return;
             }
 
