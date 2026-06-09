@@ -133,7 +133,12 @@
                 const measureFieldName = measureEncoding && measureEncoding.fields && measureEncoding.fields.length > 0 ? measureEncoding.fields[0].name : null;
 
                 if (!xAxisFieldName || !measureFieldName) {
-                    showError("Harap seret data ke rak <b>X-Axis</b> (kategori) dan rak <b>Measure</b> (nilai) pada Marks Card.", "Posisikan Kolom Data");
+                    const debugInfo = `<br/><br/><small style="color:#f1f5f9; font-family:monospace; display:block; text-align:left; background:#0f172a; padding:12px; border-radius:8px; margin-top:12px; overflow-x:auto; font-size:11px;">DEBUG INFO:<br/>
+                    dim: ${JSON.stringify(dimensionEncoding)}<br/>
+                    x: ${JSON.stringify(xAxisEncoding)}<br/>
+                    meas: ${JSON.stringify(measureEncoding)}<br/>
+                    spec: ${JSON.stringify(visualSpec)}</small>`;
+                    showError("Harap seret data ke rak <b>X-Axis</b> (kategori) dan rak <b>Measure</b> (nilai) pada Marks Card." + debugInfo, "Posisikan Kolom Data");
                     return;
                 }
 
